@@ -1,6 +1,7 @@
 # Import all the required libraries
-import discord.ext.commands as discord
+import discord.ext.commands as discordcoms
 import discord.utils as discordutils
+import discord
 import random
 import asyncio
 import sqlite3
@@ -25,19 +26,19 @@ def user_from_mention(mention):
 roulette_in_progress = False
 # Get bot token
 with open("bot-token.txt", mode="r") as f:
-    token = f.readlines()[0]
+    token = f.readlines()[0].replace("\n","")
 
 # Create bot object
-bot = discord.Bot(command_prefix="..")
+bot = discordcoms.Bot(command_prefix="..")
 
 # Initialise Roulette Game class
 class rouletteGame(object):
     async def init(self, ctx):
         self.ctx = ctx
         self.betting_zones = list(map(str, range(37))) + ["1-12","13-24","25-36","1-18","19-36"] + ["red","black","even","odd"] + ["1st","2nd","3rd"]
-        self.roll = random.randint(0,37) # Fair, I promise!
+        self.roll = random.randint(0,36) # Fair, I promise!
         self.bets = []
-        self.timer = 5
+        self.timer = 30
     async def add_bet(self, user, bet, betting_zone):
         try:
             bet = int(bet)
@@ -56,17 +57,16 @@ class rouletteGame(object):
             else:
                 return False
     async def decrement_timer(self):
-        await self.ctx.send("5")
         while self.timer > 0:
+            await asyncio.sleep(1)
             self.timer -= 1
             if self.timer == 0:
-                await self.payout(self.ctx)
-                time.sleep(1)
-            else:
-                await self.ctx.send(self.timer)
+                await self.payout()
+            elif self.timer == 10:
+                await self.ctx.send("10 seconds to go!")
 
 
-    async def payout(self, ctx):
+    async def payout(self):
         winners = []
         for bet in self.bets:
             if bet[2] == "1-12":
@@ -112,7 +112,9 @@ class rouletteGame(object):
             user_balance += winner[1]
             database.execute("UPDATE users SET balance=(?) WHERE discordID=(?)", (user_balance, winner[0]))
             database.commit()
-        await ctx.send(out)
+        await self.ctx.send(out)
+        global roulette_in_progress
+        roulette_in_progress = False
         
 
 
@@ -123,31 +125,31 @@ async def roulette(ctx, bet, betting_zone):
     if (not roulette_in_progress):
         global game
         game = rouletteGame()
+        roulette_in_progress = True
         await game.init(ctx)
-        await ctx.send("A game of roulette has begun! 30 secodns!")
         bet_success = await game.add_bet(ctx.author, bet, betting_zone)
         if bet_success:
-            await ctx.send("Bet added successfully!")
+            await ctx.send(f"A new game of roulette has begun! {game.timer}s to go!")
+            await ctx.send(f"{ctx.author.mention}, you have bet **£{bet}** on `{betting_zone}`!")
             await game.decrement_timer()
         else:
             await ctx.send("There was a problem with your bet! Can you afford it or is the betting zone wrong?")
     else:
         bet_success = await game.add_bet(ctx.author, bet, betting_zone)
         if bet_success:
-            await ctx.send("Bet added successfully!")
+            await ctx.send(f"{ctx.author.mention}, you have bet **£{bet}** on `{betting_zone}`!")
         else:
             await ctx.send("There was a problem with your bet! Can you afford it or is the betting zone wrong?")
 
 @bot.command()
-async def give_100(ctx):
+async def set_100(ctx):
     user_balance = list(database.execute("SELECT balance FROM users WHERE discordID=(?)", (ctx.author.id,)))
     if len(user_balance) == 0:
         await ctx.send("I don't know you! Use ..init first!")
     else:
-        user_balance = user_balance[0][0]
-        user_balance += 100
+        user_balance = 100
         database.execute("UPDATE users SET balance=(?) WHERE discordID=(?)", (user_balance, ctx.author.id))
-        await ctx.send("Added £100 successfully!")
+        await ctx.send("Set balance to £100 successfully!")
         database.commit()
 
 @bot.command()
@@ -172,6 +174,13 @@ async def bal(ctx, *user):
         await ctx.send("Too many arguments!")
 
 @bot.command()
+async def helpme(ctx):
+    help_message = """```..init                  - initialise yourself in the database
+..set_100               - set your balance to £100
+..bal                   - get your balance
+..roulette <bet> <zone> - play roulette```"""
+    await ctx.send(help_message)
+@bot.command()
 async def init(ctx):
     if tuple([ctx.author.id]) not in database.execute("SELECT discordID FROM users"):
         database.execute("INSERT INTO users VALUES (?,?)", (ctx.author.id, 500))
@@ -187,6 +196,7 @@ async def on_ready():
     print(f"Name: {bot.user.name}")
     print(f"ID: {bot.user.id}")
     print("~"*25)
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for ..helpme"))
 
 # Start her up!
 bot.run(token)
