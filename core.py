@@ -29,7 +29,7 @@ with open("bot-token.txt", mode="r") as f:
     token = f.readlines()[0].replace("\n","")
 
 # Create bot object
-bot = discordcoms.Bot(command_prefix="..")
+bot = discordcoms.Bot(command_prefix="/")
 
 # Initialise Roulette Game class
 class rouletteGame(object):
@@ -121,6 +121,7 @@ class rouletteGame(object):
 # Initialise Commands
 @bot.command()
 async def roulette(ctx, bet, betting_zone):
+    """Play a game of roulette! Usage: roulette <bet> <zone>"""
     global roulette_in_progress
     if (not roulette_in_progress):
         global game
@@ -143,6 +144,7 @@ async def roulette(ctx, bet, betting_zone):
 
 @bot.command()
 async def set_100(ctx):
+    """Set your balance to £100"""
     user_balance = list(database.execute("SELECT balance FROM users WHERE discordID=(?)", (ctx.author.id,)))
     if len(user_balance) == 0:
         await ctx.send("I don't know you! Use ..init first!")
@@ -154,6 +156,7 @@ async def set_100(ctx):
 
 @bot.command()
 async def bal(ctx, *user):
+    """Get your or another person's balance"""
     if len(user) == 1:
         user = user_from_mention(user[0])
         if user == None:
@@ -174,14 +177,8 @@ async def bal(ctx, *user):
         await ctx.send("Too many arguments!")
 
 @bot.command()
-async def helpme(ctx):
-    help_message = """```..init                  - initialise yourself in the database
-..set_100               - set your balance to £100
-..bal                   - get your balance
-..roulette <bet> <zone> - play roulette```"""
-    await ctx.send(help_message)
-@bot.command()
 async def init(ctx):
+    """Initialise yourself in the database!"""
     if tuple([ctx.author.id]) not in database.execute("SELECT discordID FROM users"):
         database.execute("INSERT INTO users VALUES (?,?)", (ctx.author.id, 500))
         database.commit()
@@ -196,7 +193,7 @@ async def on_ready():
     print(f"Name: {bot.user.name}")
     print(f"ID: {bot.user.id}")
     print("~"*25)
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for ..helpme"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for /help"))
 
 # Start her up!
 bot.run(token)
