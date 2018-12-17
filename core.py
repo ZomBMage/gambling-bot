@@ -61,7 +61,7 @@ class rouletteGame(object):
             self.timer -= 1
             if self.timer == 0:
                 await self.payout(self.ctx)
-                time.sleep(1)
+                await asyncio.sleep(1)
             else:
                 await self.ctx.send(self.timer)
 
@@ -124,10 +124,8 @@ async def roulette(ctx, bet, betting_zone):
         global game
         game = rouletteGame()
         await game.init(ctx)
-        await ctx.send("A game of roulette has begun! 30 secodns!")
         bet_success = await game.add_bet(ctx.author, bet, betting_zone)
         if bet_success:
-            await ctx.send("Bet added successfully!")
             await game.decrement_timer()
         else:
             await ctx.send("There was a problem with your bet! Can you afford it or is the betting zone wrong?")
